@@ -74,7 +74,7 @@ def get_args_parser() -> argparse.ArgumentParser:
         "--fold",
         default=0,
         type=int,
-        help="Fold index: for COCO and LVIS",
+        help="Fold index: for COCO, LVIS, iSAID, PASCAL-Part, PACO-Part",
     )
 
     # Runtime

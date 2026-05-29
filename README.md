@@ -160,6 +160,7 @@ python inference_segmentation.py --dataset coco --exp-name insid3-coco
 - `--model-size`: DINOv3 backbone size (`small`, `base`, `large`, default: `large`)
 - `--shots`: number of reference images per episode (e.g., 1-shot, 5-shot, default: 1)
 - `--image-size`: input image resolution (default: `1024`). Reducing it can substantially speed up inference with minimal drop in performance (e.g., `--image-size 768`)
+- `--fold`: dataset fold to evaluate (default: `0`). Used by multi-fold datasets: COCO, PACO-Part, and PASCAL-Part have 4 folds; iSAID has 3; LVIS has 10
 
 - Other args: hyperparameters (e.g., `--tau`, `--merge-thresh`, `--svd-comps`) have default values as in the paper; pass them to override the defaults. See `opts.py`.
 
