@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 
 # ──────── evaluator for in-context segmentation ────────
@@ -68,6 +69,11 @@ class Evaluator:
 
         if tgt_ignore_idx is not None:
             tgt_ignore_idx = tgt_ignore_idx.to(gt.device)
+            if tgt_ignore_idx.shape != gt.shape[-2:]:
+                tgt_ignore_idx = F.interpolate(
+                    tgt_ignore_idx.unsqueeze(0).unsqueeze(0).float(),
+                    size=gt.shape[-2:], mode='nearest',
+                ).squeeze(0).squeeze(0)
             assert torch.logical_and(tgt_ignore_idx, gt).sum() == 0
             tgt_ignore_idx *= cls.ignore_index
             gt = gt + tgt_ignore_idx
