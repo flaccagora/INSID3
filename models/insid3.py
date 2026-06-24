@@ -224,10 +224,15 @@ class INSID3(nn.Module):
     
     # ──────── Feature extraction ────────
 
+    @torch.no_grad()
     def _extract_features(self, imgs: torch.Tensor) -> torch.Tensor:
         B, T = imgs.shape[:2]
         x = einops.rearrange(imgs, 'b t c h w -> (b t) c h w')
-        fmaps = self.encoder.get_intermediate_layers(x, n=1, reshape=True)[0]
+        if x.is_cuda:
+            with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+                fmaps = self.encoder.get_intermediate_layers(x, n=1, reshape=True)[0]
+        else:
+            fmaps = self.encoder.get_intermediate_layers(x, n=1, reshape=True)[0]
         return einops.rearrange(fmaps, '(b t) c h w -> b t c h w', b=B)
 
     # ──────── Positional debiasing ────────
@@ -255,7 +260,7 @@ class INSID3(nn.Module):
         B, T, C, H, W = fmaps_norm.shape
         X = fmaps_norm.reshape(B * T, C, H * W)
 
-        basis = self.positional_basis.to(X.device)
+        basis = self.positional_basis.to(device=X.device, dtype=X.dtype)
         P_perp = torch.eye(C, device=X.device, dtype=X.dtype) - basis @ basis.T
         X_deb = torch.matmul(P_perp.unsqueeze(0), X).reshape(B, T, C, H, W)
         return F.normalize(X_deb, p=2, dim=2)

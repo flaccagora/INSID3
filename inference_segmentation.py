@@ -29,6 +29,10 @@ def main(args: argparse.Namespace) -> float:
     random.seed(args.seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+    if torch.cuda.is_available() and torch.cuda.get_device_properties(0).major >= 8:
+        # turn on tfloat32 for Ampere GPUs (https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices)
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
 
     log_file = join(args.output_dir, 'log.txt')
     with open(log_file, 'w') as fp:
@@ -54,7 +58,7 @@ def evaluate(args: argparse.Namespace, model: torch.nn.Module, log_file: str) ->
     ds = build_dataset(args.dataset, args=args)
     loader = DataLoader(ds, batch_size=1, shuffle=False, num_workers=args.num_workers,
                         collate_fn=lambda x: x[0])
-    meter = AverageMeter(args.dataset, ds.class_ids)
+    meter = AverageMeter(args.dataset, ds.class_ids, device=args.device)
 
     # ──────── Evaluation loop ────────
     pbar = tqdm(loader, ncols=80)
@@ -82,7 +86,7 @@ def evaluate(args: argparse.Namespace, model: torch.nn.Module, log_file: str) ->
             pred_mask, tgt_mask,
             tgt_ignore_idx=batch.get('tgt_ignore_idx'),
         )
-        meter.update(area_inter, area_union, batch['class_id'].cuda())
+        meter.update(area_inter, area_union, batch['class_id'].to(args.device))
 
         if (idx + 1) % 50 == 0:
             miou = meter.compute_iou()[0]

@@ -20,11 +20,12 @@ NCLASS = {
 class AverageMeter:
     """Accumulates per-class intersection and union for mIoU computation."""
 
-    def __init__(self, dataset_name: str, class_ids: list[int]):
-        self.class_ids_interest = torch.tensor(class_ids).cuda()
+    def __init__(self, dataset_name: str, class_ids: list[int], device: str = "cuda"):
+        self.device = torch.device(device)
+        self.class_ids_interest = torch.tensor(class_ids, device=self.device)
         self.nclass = NCLASS.get(dataset_name, max(class_ids) + 1)
-        self.intersection_buf = torch.zeros(2, self.nclass).float().cuda()
-        self.union_buf = torch.zeros(2, self.nclass).float().cuda()
+        self.intersection_buf = torch.zeros(2, self.nclass, device=self.device).float()
+        self.union_buf = torch.zeros(2, self.nclass, device=self.device).float()
 
     def update(self, inter_b: torch.Tensor, union_b: torch.Tensor, class_id: torch.Tensor) -> None:
         self.intersection_buf.index_add_(1, class_id, inter_b.float())

@@ -28,6 +28,10 @@ def main(args: argparse.Namespace) -> tuple:
     random.seed(args.seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+    if torch.cuda.is_available() and torch.cuda.get_device_properties(0).major >= 8:
+        # turn on tfloat32 for Ampere GPUs (https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices)
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
 
     log_file = join(args.output_dir, 'log.txt')
     with open(log_file, 'w') as fp:

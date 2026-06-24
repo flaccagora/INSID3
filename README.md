@@ -109,7 +109,7 @@ By default, we use the Large model (```dinov3_vitl16_pretrain_lvd1689m-8aa4cbdd.
 
 ## 📍 Minimal Usage
 
-Here is a minimal example to segment a target image given a reference image and its mask. You can also try MARCO directly in our [Colab Demo](https://colab.research.google.com/drive/1zCEqTS6lIbfaV3peNO5-m3U3FC8N2wNk?usp=sharing) on your own images ✨
+Here is a minimal example to segment a target image given a reference image and its mask. You can also try INSID3 directly in our [Colab Demo](https://colab.research.google.com/drive/1zCEqTS6lIbfaV3peNO5-m3U3FC8N2wNk?usp=sharing) on your own images ✨
 
 ```python
 from models import build_insid3
