@@ -166,7 +166,7 @@ python inference_segmentation.py --dataset coco --exp-name insid3-coco
 
 
 
-**Note:** By default, the predicted mask is upsampled to the original image resolution using **bilinear interpolation**. For additional refinement, enable **CRF-based refinement** with `--crf-mask-refinement`.
+**Note:** By default, the predicted mask is upsampled to the original image resolution using **bilinear interpolation**. For additional refinement, enable **CRF-based refinement** with `--crf-mask-refinement`. Control the CRF resolution with `--crf-size` (default: `640`); higher values may improve quality at the cost of speed.
  
 ## 🧹 Semantic Correspondence
 

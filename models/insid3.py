@@ -26,6 +26,7 @@ class INSID3(nn.Module):
         tau: float = 0.6,
         merge_threshold: float = 0.2,
         mask_refiner: str = "bilinear",
+        crf_size: int = 640,
         resize_to_orig_size: bool = True,
         device: str = "cuda",
     ):
@@ -37,12 +38,16 @@ class INSID3(nn.Module):
         self.tau = tau
         self.merge_threshold = merge_threshold
         self.mask_refiner = mask_refiner
+        self.crf_size = crf_size
         self.resize_to_orig_size = resize_to_orig_size
 
         self.positional_basis = self._build_positional_basis(self.device)
 
         if mask_refiner == 'crf':
-            self._crf, self._crf_band_px, self._crf_p_core = init_crf(image_size, self.device)
+            self._crf_size = (self.crf_size, self.crf_size)
+            self._crf, self._crf_band_px, self._crf_p_core = init_crf(
+                self.crf_size, self.device
+            )
 
         self._transform = build_transform(image_size)
         self.reset_state()
@@ -363,10 +368,16 @@ class INSID3(nn.Module):
     def _finalize_mask(self, mask: torch.Tensor, tgt_image: torch.Tensor) -> torch.Tensor:
         """Upsample feature-resolution mask, optionally with CRF refinement."""
         H, W = tgt_image.shape[-2:]
-        up = upsample_mask(mask, H, W)
         if self.mask_refiner == 'crf':
-            up = crf_refine(self._crf, self._crf_band_px, self._crf_p_core, tgt_image, up)
-        # Resize to original target resolution
+            tgt_image_crf = F.interpolate(
+                tgt_image, size=self._crf_size, mode='bilinear', align_corners=False
+            )
+            mask = upsample_mask(mask, *self._crf_size)
+            mask = crf_refine(
+                self._crf, self._crf_band_px, self._crf_p_core, tgt_image_crf, mask
+            )
         if self.resize_to_orig_size:
-            up = upsample_mask(up, self._orig_tgt_size[0], self._orig_tgt_size[1])
+            up = upsample_mask(mask, self._orig_tgt_size[0], self._orig_tgt_size[1])
+        else:
+            up = upsample_mask(mask, H, W)
         return up

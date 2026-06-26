@@ -29,6 +29,12 @@ def get_args_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Enable CRF-based mask refinement.",
     )
+    parser.add_argument(
+        "--crf-size",
+        default=640,
+        type=int,
+        help="Spatial resolution used for CRF mask refinement.",
+    )
 
     # Episode
     parser.add_argument(
