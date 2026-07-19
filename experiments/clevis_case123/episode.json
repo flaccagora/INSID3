@@ -1,0 +1,12 @@
+{
+  "source": "SurgVU smoke case123",
+  "reference_frame": 660,
+  "target_frame": 900,
+  "instrument_track_id": 1,
+  "reference_image": "reference.png",
+  "reference_mask": "reference_instrument_mask.png",
+  "target_image": "target.png",
+  "target_mask": "target_instrument_mask.png",
+  "reference_clevis_xy": [831, 552],
+  "target_clevis_xy": [887, 536]
+}

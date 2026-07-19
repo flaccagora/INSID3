@@ -1,0 +1,25 @@
+{
+  "name": "surgvu_case123_to_case122",
+  "references": [
+    {
+      "image": "data/reference_case123_f660.png",
+      "mask": "data/reference_case123_f660_mask.png",
+      "video": "case123",
+      "frame": 660,
+      "description": "lower-right monopolar curved scissors"
+    }
+  ],
+  "target": {
+    "image": "data/target_case122_f600.png",
+    "video": "case122",
+    "frame": 600,
+    "description": "right MegaSutureCut Needle Driver (USM3); no target mask yet"
+  },
+  "correspondence": {
+    "reference_index": 0,
+    "reference_keypoints_xy": [[831, 552]],
+    "target_keypoints_xy": [[1013, 365]],
+    "keypoint_names": ["clevis"],
+    "debiased": true
+  }
+}
