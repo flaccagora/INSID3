@@ -102,6 +102,16 @@ class INSID3(nn.Module):
         
         self.reset_state()
         return pred
+
+    def segment_with_confidence(self) -> tuple[torch.Tensor, torch.Tensor]:
+        """Segment and return a dense target-resolution confidence map."""
+        if self._ref_images is None or self._ref_masks is None or self._tgt_image is None:
+            raise RuntimeError('segment_with_confidence() requires references, masks, and a target.')
+        pred, confidence = self.predict_mask(
+            self._ref_images, self._ref_masks, self._tgt_image, return_confidence=True
+        )
+        self.reset_state()
+        return pred, confidence
     
     def match(self, src_kps: torch.Tensor, use_debiased: bool = True) -> torch.Tensor:
         """Match source keypoints using previously set reference and target.
@@ -115,11 +125,33 @@ class INSID3(nn.Module):
 
         self.reset_state()
         return pred
+
+    def match_with_confidence(
+        self, src_kps: torch.Tensor, use_debiased: bool = True
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Match keypoints and return peak cosine similarity per point."""
+        if self._ref_images is None or self._tgt_image is None:
+            raise RuntimeError('match_with_confidence() requires a reference and target.')
+        pred, confidence = self.predict_keypoint(
+            self._ref_images,
+            src_kps,
+            self._tgt_image,
+            use_debiased=use_debiased,
+            return_confidence=True,
+        )
+        self.reset_state()
+        return pred, confidence
     
     # ──────── Inference: segmentation ────────
 
     @torch.no_grad()
-    def predict_mask(self, ref_images: torch.Tensor, ref_masks: torch.Tensor, tgt_image: torch.Tensor) -> torch.Tensor:
+    def predict_mask(
+        self,
+        ref_images: torch.Tensor,
+        ref_masks: torch.Tensor,
+        tgt_image: torch.Tensor,
+        return_confidence: bool = False,
+    ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
         """Segment the target image given reference image(s) and mask(s).
 
         Args:
@@ -168,7 +200,9 @@ class INSID3(nn.Module):
             sim_maps, ref_masks, feat_tgt_deb, ref_prototype, h, w
         )
         if candidate_mask.sum() == 0:
-            return self._finalize_mask(candidate_mask, tgt_image)
+            final = self._finalize_mask(candidate_mask, tgt_image)
+            confidence = self._finalize_confidence(candidate_mask.float(), tgt_image)
+            return (final, confidence) if return_confidence else final
 
         # Fine-grained clustering
         feat_tgt_flat = feat_tgt[0].reshape(C, -1).permute(1, 0)
@@ -181,17 +215,26 @@ class INSID3(nn.Module):
         )
 
         # Seed selection and cluster aggregation
-        pred_mask = self._seed_and_aggregate(
+        pred_mask, confidence = self._seed_and_aggregate(
             candidate_mask, cluster_labels, cluster_protos, K,
             ref_prototype, feat_tgt, feat_tgt_deb, h, w
         )
 
-        return self._finalize_mask(pred_mask, tgt_image)
+        final = self._finalize_mask(pred_mask, tgt_image)
+        final_confidence = self._finalize_confidence(confidence, tgt_image)
+        return (final, final_confidence) if return_confidence else final
 
     # ──────── Inference: semantic correspondence ────────
 
     @torch.no_grad()
-    def predict_keypoint(self, ref_image: torch.Tensor, ref_kps: torch.Tensor, tgt_image: torch.Tensor, use_debiased: bool = False) -> torch.Tensor:
+    def predict_keypoint(
+        self,
+        ref_image: torch.Tensor,
+        ref_kps: torch.Tensor,
+        tgt_image: torch.Tensor,
+        use_debiased: bool = False,
+        return_confidence: bool = False,
+    ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
         """Predict target keypoints given a reference image and keypoints.
 
         Args:
@@ -225,7 +268,9 @@ class INSID3(nn.Module):
         src_desc = feat_ref[:, src_y, src_x].transpose(0, 1)
         sim_map = (src_desc @ feat_tgt.flatten(1)).view(1, -1, h, w)
         matches = kernel_softargmax_get_matches_logits(sim_map, 0.04, 7)
-        return rescale_points(matches, (h, w), self._orig_tgt_size)[0]
+        points = rescale_points(matches, (h, w), self._orig_tgt_size)[0]
+        confidence = sim_map.flatten(2).amax(dim=2)[0]
+        return (points, confidence) if return_confidence else points
     
     # ──────── Feature extraction ────────
 
@@ -323,7 +368,7 @@ class INSID3(nn.Module):
         """Select the seed cluster and aggregate remaining clusters."""
         matched_mask = candidate_mask & (cluster_labels >= 0)
         if matched_mask.sum() == 0:
-            return candidate_mask
+            return candidate_mask, candidate_mask.float()
 
         matched_ids, n_pixels = cluster_labels[matched_mask].unique(return_counts=True)
 
@@ -361,7 +406,9 @@ class INSID3(nn.Module):
         final_mask = torch.zeros(h, w, dtype=torch.bool, device=cluster_labels.device)
         valid = cluster_labels >= 0
         final_mask[valid] = combined[cluster_labels[valid]] > self.merge_threshold
-        return final_mask
+        confidence = torch.zeros(h, w, dtype=combined.dtype, device=combined.device)
+        confidence[valid] = combined[cluster_labels[valid]]
+        return final_mask, confidence
 
     # ──────── Mask finalization ────────
 
@@ -381,3 +428,11 @@ class INSID3(nn.Module):
         else:
             up = upsample_mask(mask, H, W)
         return up
+
+    def _finalize_confidence(self, confidence: torch.Tensor, tgt_image: torch.Tensor) -> torch.Tensor:
+        """Resize a feature-grid confidence map without thresholding it."""
+        H, W = tgt_image.shape[-2:]
+        size = self._orig_tgt_size if self.resize_to_orig_size else (H, W)
+        return F.interpolate(
+            confidence[None, None].float(), size=size, mode="bilinear", align_corners=False
+        )[0, 0]
