@@ -1,0 +1,28 @@
+services:
+  insid3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: insid3:latest
+    container_name: insid3
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - CUDA_VISIBLE_DEVICES=0
+      - TORCH_DEVICE=cuda
+    volumes:
+      - .:/workspace/INSID3
+      - ./pretrain:/workspace/INSID3/pretrain
+      - ./data:/workspace/INSID3/data
+      - ./output:/workspace/INSID3/output
+    working_dir: /workspace/INSID3
+    ipc: host
+    stdin_open: true
+    tty: true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
